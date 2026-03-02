@@ -5,6 +5,7 @@ using RPG.Movement;
 using RPG.Combat;
 using RPG.Core;
 using UnityEngine.EventSystems;
+using UnityEngine.AI;
 
 namespace RPG.Control
 {
@@ -12,15 +13,6 @@ namespace RPG.Control
     {
         private Move _mover;
         private Health _health;
-        
-        enum CursorType
-        {
-            None,
-            Movement,
-            Combat,
-            UI
-        }
-        
         [System.Serializable]
         struct CursorMapping
         {
@@ -28,8 +20,9 @@ namespace RPG.Control
             public Texture2D texture;
             public Vector2 hotspot;
         }
-        
+
         [SerializeField] CursorMapping[] cursorMappings = null;
+        [SerializeField] float maxNavMeshProjectionDistance = 1f;
 
         private void Awake()
         {
@@ -40,10 +33,10 @@ namespace RPG.Control
         {
             _mover = GetComponent<Move>();
         }
-        
+
         void Update()
         {
-            if(InteractWithUI())
+            if (InteractWithUI())
             {
                 return;
             }
@@ -58,7 +51,7 @@ namespace RPG.Control
             {
                 return;
             }
-            
+
             if (InteractWithMovement())
             {
                 return;
@@ -76,12 +69,25 @@ namespace RPG.Control
                 {
                     if (raycastable.HandleRaycast(this))
                     {
-                        SetCursor(CursorType.Combat);
+                        SetCursor(raycastable.GetCursorType());
                         return true;
                     }
                 }
             }
             return false;
+        }
+
+        RaycastHit[] RaycastAllSorted()
+        {
+
+            RaycastHit[] hits = Physics.RaycastAll(GetMouseRay());
+            float[] distnaces = new float[hits.Length];
+            for (int i = 0; i < hits.Length; i++)
+            {
+                distnaces[i] = hits[i].distance;
+            }
+            Array.Sort(distnaces, hits);
+            return hits;
         }
 
         private bool InteractWithUI()
@@ -113,21 +119,42 @@ namespace RPG.Control
             }
             return cursorMappings[0];
         }
-        
+
         private bool InteractWithMovement()
         {
-            RaycastHit hit;
-            if (Physics.Raycast(GetMouseRay(), out hit))
+            Vector3 target;
+            bool hasHit = RaycastNavMesh(out target);
+            if (hasHit)
             {
                 if (Input.GetMouseButton(0))
                 {
-                    _mover.StartMoveAction(hit.point, 1f);
+                    _mover.StartMoveAction(target, 1f);
                 }
                 SetCursor(CursorType.Movement);
                 return true;
             }
 
             return false;
+        }
+
+        private bool RaycastNavMesh(out Vector3 target)
+        {
+            target = new Vector3();
+            RaycastHit hit;
+            bool hasHit = Physics.Raycast(GetMouseRay(), out hit);
+            if (!hasHit)
+            {
+                return false;
+            }
+
+            NavMeshHit navMeshHit;
+            bool hasCastToNavMesh = NavMesh.SamplePosition(hit.point, out navMeshHit, maxNavMeshProjectionDistance, NavMesh.AllAreas);
+            if (!hasCastToNavMesh)
+            {
+                return false;
+            }
+            target = navMeshHit.position;
+            return true;
         }
 
         private static Ray GetMouseRay()

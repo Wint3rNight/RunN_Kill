@@ -30,7 +30,7 @@ namespace RPG.Combat
             yield return new WaitForSeconds(seconds);
             ShowPickup(true);
         }
-        
+
 
         private void ShowPickup(bool shouldShow)
         {
@@ -49,6 +49,11 @@ namespace RPG.Combat
             }
 
             return true;
+        }
+
+        public CursorType GetCursorType()
+        {
+            return CursorType.Pickup;
         }
     }
 }
